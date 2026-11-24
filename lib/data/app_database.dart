@@ -15,7 +15,17 @@ class Tareas extends Table {
 class AppDatabase extends _$AppDatabase {
   /// Sin argumento abre la base persistente; las pruebas pasarán una en memoria.
   AppDatabase([QueryExecutor? executor])
-    : super(executor ?? driftDatabase(name: 'tareas'));
+    : super(
+        executor ??
+            driftDatabase(
+              name: 'tareas',
+              // Solo se usa en web: archivos que están en la carpeta web/.
+              web: DriftWebOptions(
+                sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+                driftWorker: Uri.parse('drift_worker.js'),
+              ),
+            ),
+      );
 
   @override
   int get schemaVersion => 1;
