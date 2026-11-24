@@ -26,4 +26,26 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> agregarTarea(String titulo) =>
       into(tareas).insert(TareasCompanion.insert(titulo: titulo));
+
+  /// Marca o desmarca una tarea. Devuelve false si el id no existe.
+  Future<bool> cambiarEstado(int id, bool completada) async {
+    final filas = await (update(tareas)..where((t) => t.id.equals(id))).write(
+      TareasCompanion(completada: Value(completada)),
+    );
+    return filas > 0;
+  }
+
+  /// Cambia solo el título. Devuelve false si el id no existe.
+  Future<bool> editarTitulo(int id, String titulo) async {
+    final filas = await (update(tareas)..where((t) => t.id.equals(id))).write(
+      TareasCompanion(titulo: Value(titulo)),
+    );
+    return filas > 0;
+  }
+
+  /// Elimina por id. Devuelve false si el id no existe.
+  Future<bool> eliminarTarea(int id) async {
+    final filas = await (delete(tareas)..where((t) => t.id.equals(id))).go();
+    return filas > 0;
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/app_database.dart';
+import '../data/validacion.dart';
 
 // Pantalla base SIN persistencia ni operaciones CRUD implementadas.
 // Conserva las indicaciones TODO para orientar tu trabajo.
@@ -18,26 +19,51 @@ class _TareasPageState extends State<TareasPage> {
   // Se crea una sola vez; así el StreamBuilder no vuelve a consultar en cada build().
   late final Stream<List<Tarea>> _tareas = widget.db.observarTareas();
 
+  /// Ejecuta una escritura y avisa si la base falla, en lugar de dejar la
+  /// excepción sin atender. Devuelve true si se guardó.
+  Future<bool> _guardar(Future<Object?> Function() operacion) async {
+    try {
+      await operacion();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        _pendiente('No se pudo guardar el cambio. Intenta de nuevo.');
+      }
+      return false;
+    }
+  }
+
   Future<void> _agregarTarea() async {
-    final titulo = _tituloController.text.trim();
-    if (titulo.isEmpty) {
+    final titulo = tituloValido(_tituloController.text);
+    if (titulo == null) {
       _pendiente('El título no puede estar vacío');
       return;
     }
-    await widget.db.agregarTarea(titulo);
-    _tituloController.clear();
+    if (await _guardar(() => widget.db.agregarTarea(titulo))) {
+      _tituloController.clear();
+    }
   }
 
-  void _alternarCompletada(Tarea tarea, bool completada) {
-    _pendiente('Implementar actualización de tarea');
+  Future<void> _alternarCompletada(Tarea tarea, bool completada) async {
+    await _guardar(() => widget.db.cambiarEstado(tarea.id, completada));
   }
 
-  void _editarTarea(Tarea tarea) {
-    _pendiente('Implementar edición de título');
+  Future<void> _editarTarea(Tarea tarea) async {
+    final nuevo = await showDialog<String>(
+      context: context,
+      builder: (_) => _DialogoEditar(inicial: tarea.titulo),
+    );
+    if (nuevo == null || !mounted) return; // canceló
+    final titulo = tituloValido(nuevo);
+    if (titulo == null) {
+      _pendiente('El título no puede estar vacío');
+      return;
+    }
+    await _guardar(() => widget.db.editarTitulo(tarea.id, titulo));
   }
 
-  void _eliminarTarea(Tarea tarea) {
-    _pendiente('Implementar eliminación de tarea');
+  Future<void> _eliminarTarea(Tarea tarea) async {
+    await _guardar(() => widget.db.eliminarTarea(tarea.id));
   }
 
   void _pendiente(String mensaje) {
@@ -136,6 +162,51 @@ class _TareasPageState extends State<TareasPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Cuadro para editar el título. Es un widget aparte para poder liberar su
+/// controlador en dispose().
+class _DialogoEditar extends StatefulWidget {
+  const _DialogoEditar({required this.inicial});
+
+  final String inicial;
+
+  @override
+  State<_DialogoEditar> createState() => _DialogoEditarState();
+}
+
+class _DialogoEditarState extends State<_DialogoEditar> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.inicial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar tarea'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Título'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Guardar'),
+        ),
+      ],
     );
   }
 }
